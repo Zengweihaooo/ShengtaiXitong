@@ -936,136 +936,6 @@
         <ul class="sum-list">${lis}</ul>
       </div>`;
   }
-  function initHeatModelViewer(options) {
-    const host = document.getElementById(options.id);
-    if (!host || !window.THREE || !THREE.GLTFLoader) return null;
-    const canvas = host.querySelector('canvas');
-    if (!canvas) return null;
-    host.classList.add('loading');
-
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
-    camera.position.set(options.camera?.[0] ?? 0, options.camera?.[1] ?? 1.2, options.camera?.[2] ?? 5.2);
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-
-    const root = new THREE.Group();
-    root.rotation.set(options.rotation?.[0] ?? 0, options.rotation?.[1] ?? -0.35, options.rotation?.[2] ?? 0);
-    scene.add(root);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0xd8c4a5, 2.3));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(3, 4, 5);
-    scene.add(key);
-    const fill = new THREE.DirectionalLight(0xf6ead8, 1.1);
-    fill.position.set(-4, 2, 2);
-    scene.add(fill);
-
-    const whiteMat = new THREE.MeshStandardMaterial({
-      color: 0xf8f6ef,
-      roughness: 0.62,
-      metalness: 0.02,
-      envMapIntensity: 0.25
-    });
-    const accentMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.74,
-      metalness: 0
-    });
-
-    function resize() {
-      const rect = host.getBoundingClientRect();
-      const width = Math.max(1, Math.round(rect.width));
-      const height = Math.max(1, Math.round(rect.height));
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-    }
-    resize();
-    window.addEventListener('resize', resize);
-
-    const loader = new THREE.GLTFLoader();
-    loader.load(options.path, gltf => {
-      const model = gltf.scene;
-      model.traverse(node => {
-        if (!node.isMesh) return;
-        node.castShadow = false;
-        node.receiveShadow = false;
-        node.material = options.kind === 'home' ? whiteMat.clone() : accentMat.clone();
-      });
-      root.add(model);
-
-      const box = new THREE.Box3().setFromObject(model);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
-      model.position.sub(center);
-      const maxDim = Math.max(size.x, size.y, size.z) || 1;
-      const scale = (options.fit ?? 2.7) / maxDim;
-      model.scale.setScalar(scale);
-      model.position.y += options.yOffset ?? 0;
-      host.classList.remove('loading');
-    }, undefined, () => {
-      host.classList.remove('loading');
-      host.classList.add('failed');
-    });
-
-    let dragging = false;
-    let lastX = 0;
-    let lastY = 0;
-    host.addEventListener('pointerdown', e => {
-      if (e.target.closest('button')) return;
-      dragging = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      host.setPointerCapture?.(e.pointerId);
-    });
-    host.addEventListener('pointermove', e => {
-      if (!dragging) return;
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      root.rotation.y += dx * 0.01;
-      root.rotation.x = Math.max(-0.7, Math.min(0.7, root.rotation.x + dy * 0.006));
-    });
-    const stopDrag = e => {
-      dragging = false;
-      if (e?.pointerId !== undefined) host.releasePointerCapture?.(e.pointerId);
-    };
-    host.addEventListener('pointerup', stopDrag);
-    host.addEventListener('pointercancel', stopDrag);
-    host.addEventListener('pointerleave', stopDrag);
-
-    function animate() {
-      if (!dragging) root.rotation.y += options.autoRotate ?? 0.0025;
-      renderer.render(scene, camera);
-      requestAnimationFrame(animate);
-    }
-    animate();
-    return { host, scene, camera, renderer, root };
-  }
-  function initHeatModels() {
-    initHeatModelViewer({
-      id: 'bodyModel',
-      path: 'assets/models/kenney-character-a.glb',
-      kind: 'body',
-      fit: 3.15,
-      yOffset: -0.15,
-      camera: [0, 1.1, 5.3],
-      rotation: [0.03, -0.32, 0],
-      autoRotate: 0.0023
-    });
-    initHeatModelViewer({
-      id: 'homeModel',
-      path: 'assets/models/kenney-building-a.glb',
-      kind: 'home',
-      fit: 3.55,
-      yOffset: -0.2,
-      camera: [0, 1.65, 5.6],
-      rotation: [-0.18, -0.56, 0],
-      autoRotate: 0.002
-    });
-  }
   function updateHeatmap() {
     const titles = [...selectedNeeds.keys()];
     const has = (...names) => names.some(name => titles.includes(name));
@@ -1142,24 +1012,24 @@
   ============================================================ */
   const CAT_LABEL = { bath: '卫浴', move: '通行', kitchen: '厨房', light: '照明', bed: '卧室', sos: '应急' };
   const PRODUCTS = [
-    { id: 'p1', cat: 'bath', emoji: '🪑', name: '适老折叠淋浴座椅', desc: '壁挂可折叠，铝合金防锈，承重 150kg，坐姿安全洗浴。', forCards: ['站着洗澡很累'], price: 299 },
-    { id: 'p2', cat: 'bath', emoji: '🛁', name: '电动升降坐浴器', desc: '一键升降入浴，水温恒控，适合行动不便长者泡浴。', forCards: ['站着洗澡很累'], price: 2680 },
-    { id: 'p3', cat: 'bath', emoji: '🤲', name: 'L 型安全抓杆', desc: '304 不锈钢，承重 ≥1.5kN，符合无障碍抓杆规范。', forCards: ['站着洗澡很累', '深夜起夜'], price: 159, hot: 1 },
-    { id: 'p4', cat: 'bath', emoji: '🚽', name: '助起马桶增高架', desc: '加高 12cm 带扶手，减轻膝关节负担，免工具安装。', forCards: ['深夜起夜', '起床困难'], price: 229 },
-    { id: 'p5', cat: 'bath', emoji: '🧴', name: '防滑地胶 / 防滑垫', desc: '湿区防滑系数 R11，吸盘底面，干湿两用。', forCards: ['深夜起夜'], price: 89 },
-    { id: 'p6', cat: 'move', emoji: '🛣️', name: '门槛斜坡过渡垫', desc: '橡胶缓坡，消除门槛高差，轮椅 / 助行器顺畅通过。', forCards: ['过门槛绊脚'], price: 129, hot: 1 },
-    { id: 'p7', cat: 'move', emoji: '🤝', name: '走廊楼梯连续扶手', desc: '木纹防滑握感，双侧连续安装，转角圆润防磕碰。', forCards: ['上下楼吃力', '过门槛绊脚'], price: 360 },
-    { id: 'p8', cat: 'move', emoji: '🛗', name: '入户便携式坡道', desc: '铝合金折叠坡道，承重 270kg，适配台阶出入口。', forCards: ['出门台阶高'], price: 480 },
-    { id: 'p9', cat: 'move', emoji: '🦯', name: '四脚助行器 / 助步车', desc: '可调高度带刹车与座椅，室内外通用，稳固防滑。', forCards: ['上下楼吃力', '出门台阶高'], price: 399 },
-    { id: 'p10', cat: 'kitchen', emoji: '🔔', name: '燃气泄漏报警 + 自动切断', desc: '检测到泄漏自动关阀并报警，可联动子女手机。', forCards: ['忘记关火'], price: 268, hot: 1 },
-    { id: 'p11', cat: 'kitchen', emoji: '🍳', name: '防干烧智能灶具', desc: '超时与高温自动熄火，离锅断气，做饭更安心。', forCards: ['忘记关火'], price: 1290 },
-    { id: 'p12', cat: 'light', emoji: '💡', name: '人体感应 LED 灯带', desc: '夜间自动亮起，柔光不刺眼，照亮走廊与床边动线。', forCards: ['走廊太暗', '深夜起夜'], price: 99 },
-    { id: 'p13', cat: 'light', emoji: '🌙', name: '起夜感应夜灯', desc: '插座式光感 + 人体感应，暖光过渡，避免眩光跌倒。', forCards: ['深夜起夜', '走廊太暗'], price: 49, hot: 1 },
-    { id: 'p14', cat: 'bed', emoji: '🛏️', name: '床边起身扶手', desc: '插床式稳固扶手带收纳袋，助力起身翻身防坠床。', forCards: ['起床困难'], price: 189, hot: 1 },
-    { id: 'p15', cat: 'bed', emoji: '🛌', name: '电动多功能护理床', desc: '背腿升降、护栏、移动滚轮，照护卧床长者更省力。', forCards: ['起床困难'], price: 3680 },
-    { id: 'p16', cat: 'sos', emoji: '🆘', name: '一键紧急呼叫器', desc: '床头 / 卫浴防水按钮，一键呼叫家人或社区中心。', forCards: ['摔倒没人知道'], price: 199, hot: 1 },
-    { id: 'p17', cat: 'sos', emoji: '⌚', name: '跌倒检测智能手环', desc: '自动识别跌倒并定位报警，心率监测，SOS 一键求助。', forCards: ['摔倒没人知道'], price: 459 },
-    { id: 'p18', cat: 'bed', emoji: '🛋️', name: '适老高背扶手椅', desc: '高背护腰、加高坐面带扶手，起坐省力，靠窗晒太阳更舒适。', forCards: ['想多晒太阳', '起床困难'], price: 899 }
+    { id: 'p1', cat: 'bath', image: 'assets/products/shower-seat.jpg', imageAlt: '带座椅的无障碍淋浴间', name: '适老折叠淋浴座椅', desc: '壁挂可折叠，铝合金防锈，承重 150kg，坐姿安全洗浴。', forCards: ['站着洗澡很累'], price: 299 },
+    { id: 'p2', cat: 'bath', image: 'assets/products/bath-transfer-bench.jpg', imageAlt: '淋浴椅、浴缸转移凳和马桶增高器', name: '浴缸转移凳 / 坐浴辅助椅', desc: '横跨浴缸边缘辅助坐姿转移，减少跨入浴缸时的滑倒风险。', forCards: ['站着洗澡很累'], price: 680 },
+    { id: 'p3', cat: 'bath', image: 'assets/products/grab-bar.png', imageAlt: '墙面安全抓杆产品图', name: 'L 型安全抓杆', desc: '304 不锈钢，承重 ≥1.5kN，符合无障碍抓杆规范。', forCards: ['站着洗澡很累', '深夜起夜'], price: 159, hot: 1 },
+    { id: 'p4', cat: 'bath', image: 'assets/products/toilet-riser.jpg', imageAlt: '带扶手的电动升降马桶座', name: '助起马桶增高架', desc: '加高 12cm 带扶手，减轻膝关节负担，免工具安装。', forCards: ['深夜起夜', '起床困难'], price: 229 },
+    { id: 'p5', cat: 'bath', image: 'assets/products/anti-slip-mat.jpg', imageAlt: '防滑垫实物图', name: '防滑地胶 / 防滑垫', desc: '湿区防滑系数 R11，吸盘底面，干湿两用。', forCards: ['深夜起夜'], price: 89 },
+    { id: 'p6', cat: 'move', image: 'assets/products/threshold-ramp.webp', imageAlt: '单级台阶无障碍坡道', name: '门槛斜坡过渡垫', desc: '橡胶缓坡，消除门槛高差，轮椅 / 助行器顺畅通过。', forCards: ['过门槛绊脚'], price: 129, hot: 1 },
+    { id: 'p7', cat: 'move', image: 'assets/products/hall-handrail.jpg', imageAlt: '连续扶手实景图', name: '走廊楼梯连续扶手', desc: '木纹防滑握感，双侧连续安装，转角圆润防磕碰。', forCards: ['上下楼吃力', '过门槛绊脚'], price: 360 },
+    { id: 'p8', cat: 'move', image: 'assets/products/portable-ramp.jpg', imageAlt: '轮椅坡道实景图', name: '入户便携式坡道', desc: '铝合金折叠坡道，承重 270kg，适配台阶出入口。', forCards: ['出门台阶高'], price: 480 },
+    { id: 'p9', cat: 'move', image: 'assets/products/rollator.jpg', imageAlt: '四轮助行器实物图', name: '四脚助行器 / 助步车', desc: '可调高度带刹车与座椅，室内外通用，稳固防滑。', forCards: ['上下楼吃力', '出门台阶高'], price: 399 },
+    { id: 'p10', cat: 'kitchen', image: 'assets/products/gas-detector.jpg', imageAlt: '燃气检测报警器实物图', name: '燃气泄漏报警 + 自动切断', desc: '检测到泄漏自动关阀并报警，可联动子女手机。', forCards: ['忘记关火'], price: 268, hot: 1 },
+    { id: 'p11', cat: 'kitchen', image: 'assets/products/cooktop.jpg', imageAlt: '嵌入式智能灶具实景图', name: '防干烧智能灶具', desc: '超时与高温自动熄火，离锅断气，做饭更安心。', forCards: ['忘记关火'], price: 1290 },
+    { id: 'p12', cat: 'light', image: 'assets/products/led-strip.jpg', imageAlt: 'LED 灯带卷盘实物图', name: '人体感应 LED 灯带', desc: '夜间自动亮起，柔光不刺眼，照亮走廊与床边动线。', forCards: ['走廊太暗', '深夜起夜'], price: 99 },
+    { id: 'p13', cat: 'light', image: 'assets/products/night-light.jpg', imageAlt: '插座式 LED 夜灯实物图', name: '起夜感应夜灯', desc: '插座式光感 + 人体感应，暖光过渡，避免眩光跌倒。', forCards: ['深夜起夜', '走廊太暗'], price: 49, hot: 1 },
+    { id: 'p14', cat: 'bed', image: 'assets/products/bed-rail.jpg', imageAlt: '护理床护栏控制面板实景图', name: '床边起身护栏扶手', desc: '床侧抓握与控制区集中布置，辅助起身、翻身和夜间呼叫。', forCards: ['起床困难'], price: 189, hot: 1 },
+    { id: 'p15', cat: 'bed', image: 'assets/products/nursing-bed.jpg', imageAlt: '电动护理床实景图', name: '电动多功能护理床', desc: '背腿升降、护栏、移动滚轮，照护卧床长者更省力。', forCards: ['起床困难'], price: 3680 },
+    { id: 'p16', cat: 'sos', image: 'assets/products/call-button.jpg', imageAlt: '医院床边呼叫按钮实物图', name: '一键紧急呼叫器', desc: '床头 / 卫浴防水按钮，一键呼叫家人或社区中心。', forCards: ['摔倒没人知道'], price: 199, hot: 1 },
+    { id: 'p17', cat: 'sos', image: 'assets/products/smartwatch.jpg', imageAlt: '智能手表产品图', name: '跌倒检测智能手环', desc: '自动识别跌倒并定位报警，心率监测，SOS 一键求助。', forCards: ['摔倒没人知道'], price: 459 },
+    { id: 'p18', cat: 'bed', image: 'assets/products/armchair.jpg', imageAlt: '高背扶手椅图像', name: '适老高背扶手椅', desc: '高背护腰、加高坐面带扶手，起坐省力，靠窗晒太阳更舒适。', forCards: ['想多晒太阳', '起床困难'], price: 899 }
   ];
 
   const prodGrid = document.getElementById('prodGrid');
@@ -1193,9 +1063,9 @@
     prodGrid.innerHTML = noteHtml + list.map((p, i) => `
       <article class="prod-card" style="animation-delay:${i * 0.04}s">
         <div class="prod-media cat-${p.cat}">
+          <img src="${p.image}" alt="${p.imageAlt}" loading="lazy" decoding="async">
           <span class="prod-badge">${CAT_LABEL[p.cat]}</span>
           ${p.hot ? '<span class="prod-hot">★ 推荐</span>' : ''}
-          <span class="prod-emoji">${p.emoji}</span>
         </div>
         <div class="prod-body">
           <h4>${p.name}</h4>
